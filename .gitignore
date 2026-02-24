@@ -1,5 +1,7 @@
 node_modules/
-dist/
+# Ignore dist contents but allow the distributable for raw GitHub URL installs
+dist/*
+!dist/browseros.user.js
 coverage/
 *.log
 .DS_Store
