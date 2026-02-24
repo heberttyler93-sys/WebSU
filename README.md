@@ -201,6 +201,30 @@ The Bus layer has no external dependencies and is independently testable. `Broad
 
 ---
 
+## Known Limitations
+
+### iOS / Mobile Safari
+
+The primary target platform has specific constraints that affect the Bus layer:
+
+**Background throttling** — iOS aggressively throttles JavaScript timers when a tab is in the background. A heartbeat set to fire every 5s may not fire for 30–60s. With the default 18s pruning timeout, background tabs will be removed from other tabs' registries while dormant. They will automatically re-appear once they become active again (the welcome-response pattern handles re-registration). If your use case requires persistent background tracking, increase `HEARTBEAT_TIMEOUT_MS` in `src/bus/constants.js` to 60,000+.
+
+**`beforeunload` unreliability** — iOS Safari often kills pages without firing `beforeunload`. The `INSTANCE_LEAVE` broadcast on tab close is best-effort only. Other tabs will fall back to heartbeat timeout detection (~18s). Do not build logic that requires INSTANCE_LEAVE to be guaranteed.
+
+**`BroadcastChannel` availability** — Requires iOS Safari 15.4+. The userscript will fail silently on older iOS versions unless a fallback is added. A future `Kernel` layer will detect and report this.
+
+**Private Browsing** — `sessionStorage.setItem()` throws `QuotaExceededError` in Private Browsing mode on some browsers. BrowserOS catches this and emits a `console.warn`. The tab will still function correctly for the session but will generate a new UUID on each page load.
+
+### Cross-origin
+
+`BroadcastChannel` is origin-scoped. Tabs on different subdomains, schemes, or ports cannot communicate. All participating tabs must be on the exact same origin. This is a browser security constraint with no workaround.
+
+### Payload serialization
+
+All published payloads must be structured-clone-safe (essentially JSON-serializable). Publishing DOM nodes, functions, Symbols, or circular references will throw a `DataCloneError`. The local-echo path (same-tab delivery) does not use structured clone and will not throw, which can create confusing asymmetric behavior. Keep all payloads as plain JSON objects.
+
+---
+
 ## Build target
 
 Single `.user.js` file in `/dist`, consumable by:
@@ -210,3 +234,5 @@ Single `.user.js` file in `/dist`, consumable by:
 - Orion browser (iOS/macOS)
 
 Source is written as ES modules and bundled to IIFE via esbuild.
+
+See [`docs/troubleshooting.md`](docs/troubleshooting.md) for detailed diagnosis of common failure modes.

@@ -86,6 +86,9 @@ export class Bus {
     if (this.#destroyed) {
       throw new Error(`[Bus] Cannot publish to destroyed bus (topic: "${topic}")`);
     }
+    if (!topic || typeof topic !== 'string') {
+      throw new TypeError(`[Bus] publish() topic must be a non-empty string (got: ${JSON.stringify(topic)})`);
+    }
 
     /** @type {BusEnvelope} */
     const envelope = {
@@ -118,6 +121,9 @@ export class Bus {
   subscribe(topic, handler) {
     if (this.#destroyed) {
       throw new Error(`[Bus] Cannot subscribe on destroyed bus (topic: "${topic}")`);
+    }
+    if (!topic || typeof topic !== 'string') {
+      throw new TypeError(`[Bus] subscribe() topic must be a non-empty string (got: ${JSON.stringify(topic)})`);
     }
     if (typeof handler !== 'function') {
       throw new TypeError(`[Bus] subscribe() handler must be a function`);

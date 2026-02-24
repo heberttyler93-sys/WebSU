@@ -76,7 +76,20 @@ export function getOrCreateInstanceId(storageKey = 'bos:instanceId') {
   let id = sessionStorage.getItem(storageKey);
   if (!id) {
     id = generateUUID();
-    sessionStorage.setItem(storageKey, id);
+    try {
+      sessionStorage.setItem(storageKey, id);
+    } catch (err) {
+      // sessionStorage.setItem throws QuotaExceededError in two cases:
+      //  1. Private/incognito browsing mode on some browsers (storage quota = 0)
+      //  2. Storage is genuinely full
+      // In either case, fall back to an in-memory ID. The tab will still work
+      // correctly for this session; it just won't survive a page refresh.
+      console.warn(
+        '[BrowserOS] Could not persist instanceId to sessionStorage ' +
+        `(${err.name}: ${err.message}). ` +
+        'Tab identity will not survive a page refresh.',
+      );
+    }
   }
   return id;
 }

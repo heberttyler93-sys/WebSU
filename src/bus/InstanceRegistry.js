@@ -285,11 +285,25 @@ export class InstanceRegistry {
 
   /**
    * Synchronous broadcast on page unload.
-   * This is best-effort — the browser may not honor async work during unload,
-   * but BroadcastChannel.postMessage is synchronous so it typically works.
+   *
+   * Best-effort: BroadcastChannel.postMessage is synchronous so it typically
+   * succeeds, but the browser may suppress it if the page is being killed
+   * (especially on iOS Safari). Other tabs will eventually prune this instance
+   * via the heartbeat timeout if the leave message is lost.
+   *
+   * NOTE: beforeunload is unreliable on iOS Safari — the page can be
+   * suspended or terminated without firing it. Do not rely on INSTANCE_LEAVE
+   * for correctness; it is an optimisation to speed up peer detection only.
    */
   #onUnload = () => {
-    this.#bus.publish(TOPICS.INSTANCE_LEAVE, { instanceId: this.#instanceId });
+    // Guard: bus may have been destroyed by another beforeunload handler
+    // or by explicit cleanup that ran before this fires.
+    if (this.#destroyed || this.#bus.isDestroyed) return;
+    try {
+      this.#bus.publish(TOPICS.INSTANCE_LEAVE, { instanceId: this.#instanceId });
+    } catch {
+      // Swallow — unload path, nothing meaningful we can do
+    }
   };
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -430,11 +444,16 @@ export class InstanceRegistry {
 
   /**
    * Apply a mutation to self's record, then broadcast the update.
-   * All public mutation methods go through here for consistency.
+   * All public mutation methods (updateRole, updatePipeline, updateMeta)
+   * go through here for consistency.
    *
    * @param {(self: InstanceRecord) => void} mutator
+   * @throws {Error} if the registry has been destroyed
    */
   #mutateSelf(mutator) {
+    if (this.#destroyed) {
+      throw new Error('[InstanceRegistry] Cannot mutate a destroyed registry');
+    }
     const self = this.#instances.get(this.#instanceId);
     if (!self) return;
 
